@@ -1,0 +1,8 @@
+# Folder dependensi Node.js (sangat besar)
+node_modules
+
+# File environment yang berisi rahasia (SANGAT PENTING!)
+.env
+
+# File log
+*.log

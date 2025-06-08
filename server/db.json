@@ -1,0 +1,25 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "email": "dosen@example.com",
+      "password": "password123",
+      "role": "dosen",
+      "name": "Dr. Budi"
+    },
+    {
+      "id": 2,
+      "email": "siswa@example.com",
+      "password": "password123",
+      "role": "siswa",
+      "name": "Andi"
+    }
+  ],
+  "attendance": {
+    "Andi": [
+        { "date": "2023-07-03", "status": "Hadir" },
+        { "date": "2023-07-04", "status": "Hadir" },
+        { "date": "2023-07-05", "status": "Sakit" }
+    ]
+  }
+}
