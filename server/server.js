@@ -11,10 +11,12 @@ const bcrypt = require('bcryptjs');
 // 2. INISIALISASI & KONEKSI
 // =================================================================
 const app = express();
-const port = 3001;
+const port = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+origin: process.env.CLIENT_URL // Ini akan disetel di lingkungan hosting Anda (Render.com)
+}));
 app.use(express.json());
 
 // Koneksi Database
