@@ -3,7 +3,7 @@ import axios from 'axios';
 import Header from '../components/Header';
 import ClassCard from '../components/ClassCard';
 import EmptyState from '../components/EmptyState';
-import MainAttendanceCard from '../components/MainattendanceCard';
+import MainAttendanceCard from '../components/MainAttendanceCard';
 import RecentAttendance from '../components/Kalender';
 
 function DosenDashboard() {

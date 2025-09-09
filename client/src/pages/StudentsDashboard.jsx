@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Link } from 'react-router-dom'; // Impor Link
 
 import Header from '../components/Hsiswa';
-import MainAttendanceCard from '../components/MainattendanceCard';
+import MainAttendanceCard from '../components/MainAttendanceCard';
 import RecentAttendance from '../components/Kalender';
 import StudentClassCard from '../components/StudentClassCard';
 
