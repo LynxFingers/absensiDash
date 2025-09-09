@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+// --- LANGKAH 1: Impor useNavigate ---
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { format, startOfWeek, addDays, subMonths, addMonths, addWeeks, subWeeks } from 'date-fns';
 import { id } from 'date-fns/locale';
@@ -26,6 +27,8 @@ const RiwayatKehadiranSiswa = ({ riwayat, selectedDate, onDateChange, onWeekChan
         }
     };
     return (
+
+        
         <div className="bg-gray-50 p-4 rounded-lg shadow-inner">
             <div className="flex justify-between items-center mb-4 px-2">
                 <h3 className="text-lg font-bold text-gray-800">Riwayat Absensi</h3>
@@ -56,9 +59,12 @@ const RiwayatKehadiranSiswa = ({ riwayat, selectedDate, onDateChange, onWeekChan
     );
 };
 
-// Komponen Utama Halaman Siswa (REVISI FINAL)
+// Komponen Utama Halaman Siswa
 const DetailKelasSiswa = () => {
     const { id: kelasId } = useParams();
+    // --- LANGKAH 2: Inisialisasi useNavigate ---
+    const navigate = useNavigate();
+
     const [kelas, setKelas] = useState(null);
     const [semuaRiwayat, setSemuaRiwayat] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -69,7 +75,6 @@ const DetailKelasSiswa = () => {
     
     const user = JSON.parse(localStorage.getItem('user'));
 
-    // --- PERBAIKAN: Pindahkan fungsi fetchInitialData ke dalam komponen ---
     const fetchInitialData = useCallback(async () => {
         if (!user?.id || !kelasId) {
             setLoading(false);
@@ -89,11 +94,11 @@ const DetailKelasSiswa = () => {
         } finally {
             setLoading(false);
         }
-    }, [kelasId, user?.id]); // Dependensi untuk useCallback
+    }, [kelasId, user?.id]);
     
     useEffect(() => {
         fetchInitialData();
-    }, [fetchInitialData]); // useEffect memanggil fungsi yang sudah di-memoize
+    }, [fetchInitialData]);
 
     const dataUntukTanggalTerpilih = useMemo(() => {
         if (!semuaRiwayat) return null;
@@ -111,9 +116,25 @@ const DetailKelasSiswa = () => {
                 status: statusUntukModal
             });
             alert(`Absensi '${statusUntukModal}' berhasil direkam!`);
-            fetchInitialData(); // Muat ulang semua data setelah berhasil absen
+            fetchInitialData();
         } catch (error) {
             alert(error.response?.data?.message || 'Gagal melakukan absensi.');
+        }
+    };
+
+    // --- LANGKAH 3: Perbaiki fungsi handleLeaveClass ---
+    const handleLeaveClass = async () => {
+        if (window.confirm('Apakah Anda yakin ingin keluar dari kelas ini? Semua riwayat absensi Anda di kelas ini akan dihapus secara permanen.')) {
+            try {
+                await axios.delete(`http://localhost:3001/api/kelas/${kelasId}/leave`, {
+                    data: { siswaId: user.id } // Kirim siswaId di dalam body untuk request DELETE
+                });
+                alert('Anda berhasil keluar dari kelas.');
+                // Alihkan pengguna ke halaman dasbor siswa setelah berhasil
+                navigate('/siswa'); 
+            } catch (error) {
+                alert(error.response?.data?.message || 'Gagal keluar dari kelas.');
+            }
         }
     };
 
@@ -127,11 +148,9 @@ const DetailKelasSiswa = () => {
         if (loading) return <p className="text-gray-500">Memuat...</p>;
 
         if (dataUntukTanggalTerpilih) {
-            // Kasus 1: Siswa sudah punya status absen (hadir, sakit, izin, dll)
             if (dataUntukTanggalTerpilih.status) {
                 return <button disabled className="bg-gray-400 text-white font-bold py-3 px-6 text-base rounded-lg cursor-not-allowed">Anda Tercatat: {dataUntukTanggalTerpilih.status}</button>;
             }
-            // Kasus 2: Sesi ada, tapi siswa belum absen. Cek apakah sesi aktif.
             const isSesiActiveNow = new Date() >= new Date(dataUntukTanggalTerpilih.waktuSesiBuka) && new Date() <= new Date(dataUntukTanggalTerpilih.waktuSesiTutup) && dataUntukTanggalTerpilih.statusSesi === 'dibuka';
             if (isSesiActiveNow) {
                 return (
@@ -145,7 +164,6 @@ const DetailKelasSiswa = () => {
             }
         }
         
-        // Kasus 3: Tidak ada data riwayat sama sekali untuk tanggal ini
         return <p className="text-gray-500">Tidak ada sesi absensi pada tanggal ini.</p>;
     };
 
@@ -154,24 +172,45 @@ const DetailKelasSiswa = () => {
 
     return (
         <div className="w-full p-4 sm:p-6 lg:p-8">
+            
             <div className="bg-gray-100 rounded-2xl shadow-lg p-6 sm:p-8 w-full max-w-7xl mx-auto">
-            <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 w-full max-w-7xl mx-auto">
-                <Link to="/siswa" className="text-sm font-semibold text-blue-600 hover:underline mb-6 inline-block">&larr; Kembali ke Dasbor</Link>
-                <ClassDetailBanner className={kelas.namaKelas} />
-                
-                <div className="mt-8">
-                    <RiwayatKehadiranSiswa riwayat={semuaRiwayat} selectedDate={selectedDate} onDateChange={setSelectedDate} onWeekChange={handleWeekChange}/>
-                </div>
-            </div>
-
-                <div className="mt-8">
-            <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 w-full max-w-7xl mx-auto">
-                    <h3 className="text-xl font-bold text-gray-800">Detail & Absensi - {format(selectedDate, 'd MMMM yyyy', { locale: id })}</h3>
-                    <div className="mt-4 p-6 bg-gray-50 rounded-lg min-h-[15rem] flex flex-col items-center justify-center text-center">
-                        {renderDetailSection()}
+                <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 w-full max-w-7xl mx-auto">
+                    
+                   <div className="flex justify-between items-center mb-6">
+    
+    {/* Link "Kembali ke Dasbor" di sebelah kiri */}
+    <Link to="/siswa" className="text-sm font-semibold text-blue-600 hover:underline">
+        &larr; Kembali ke Dasbor
+    </Link>
+    
+    {/* Tombol "Keluar Kelas" di sebelah kanan */}
+    <button
+        onClick={handleLeaveClass}
+        className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 text-sm rounded-lg transition-colors duration-200"
+        title="Keluar dari kelas ini"
+    >
+        Keluar Kelas
+    </button>
+</div>
+                    
+                    <ClassDetailBanner className={kelas.namaKelas} />
+                    
+                    <div className="mt-8">
+                        <RiwayatKehadiranSiswa riwayat={semuaRiwayat} selectedDate={selectedDate} onDateChange={setSelectedDate} onWeekChange={handleWeekChange}/>
                     </div>
                 </div>
-            </div>
+
+                <div className="mt-8">
+                    <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 w-full max-w-7xl mx-auto">
+                        <h3 className="text-xl font-bold text-gray-800">Detail & Absensi - {format(selectedDate, 'd MMMM yyyy', { locale: id })}</h3>
+                        <div className="mt-4 p-6 bg-gray-50 rounded-lg min-h-[15rem] flex flex-col items-center justify-center text-center">
+                            {renderDetailSection()}
+                        </div>
+                    </div>
+                </div>
+
+                {/* --- LANGKAH 4: Tambahkan Bagian Pengaturan & Tombol Keluar Kelas --- */}
+                
             </div>
             
             {isAbsenModalOpen && (

@@ -14,9 +14,7 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors({
-origin: process.env.CLIENT_URL // Ini akan disetel di lingkungan hosting Anda (Render.com)
-}));
+app.use(cors());
 app.use(express.json());
 
 // Koneksi Database
@@ -42,8 +40,25 @@ const User = sequelize.define('User', {
 });
 
 const Kelas = sequelize.define('Kelas', {
-  namaKelas: { type: DataTypes.STRING, allowNull: false },
-  kodeKelas: { type: DataTypes.STRING, allowNull: false, unique: true }
+    namaKelas: { type: DataTypes.STRING, allowNull: false },
+    kodeKelas: { type: DataTypes.STRING, allowNull: false, unique: true }
+}, {
+    // --- TAMBAHKAN HOOK INI ---
+    // Hook ini akan berjalan secara otomatis SEBELUM sebuah record Kelas dihapus
+    hooks: {
+        beforeDestroy: async (kelas, options) => {
+            // Hapus semua asosiasi siswa dari kelas ini di tabel penghubung (KelasSiswa)
+            // Ini akan membersihkan catatan pendaftaran siswa
+            await kelas.setSiswa([], { transaction: options.transaction });
+            
+            // Kita juga bisa menambahkan penghapusan sesi di sini sebagai pengaman,
+            // meskipun `onDelete: 'CASCADE'` seharusnya sudah menanganinya.
+            await SesiAbsensi.destroy({ 
+                where: { kelasId: kelas.id },
+                transaction: options.transaction
+            });
+        }
+    }
 });
 
 const SesiAbsensi = sequelize.define('SesiAbsensi', {
@@ -69,10 +84,11 @@ Kelas.belongsTo(User, { as: 'dosen', foreignKey: 'dosenId' });
 User.belongsToMany(Kelas, { as: 'kelasDiikuti', through: KelasSiswa, foreignKey: 'userId' });
 Kelas.belongsToMany(User, { as: 'siswa', through: KelasSiswa, foreignKey: 'kelasId' });
 
-Kelas.hasMany(SesiAbsensi, { foreignKey: 'kelasId' });
+Kelas.hasMany(SesiAbsensi, { foreignKey: 'kelasId', onDelete: 'CASCADE' });
 SesiAbsensi.belongsTo(Kelas, { foreignKey: 'kelasId' });
 
-SesiAbsensi.hasMany(Absensi, { foreignKey: 'sesiId' });
+// Menambahkan onDelete: 'CASCADE' agar saat sesi dihapus, absensi ikut terhapus
+SesiAbsensi.hasMany(Absensi, { foreignKey: 'sesiId', onDelete: 'CASCADE' });
 Absensi.belongsTo(SesiAbsensi, { foreignKey: 'sesiId' });
 
 User.hasMany(Absensi, { foreignKey: 'userId' });
@@ -371,6 +387,92 @@ app.get('/api/kelas/:kelasId/riwayat-siswa/:siswaId', async (req, res) => {
     }
 });
 
+
+
+// --- [ENDPOINT BARU] UNTUK UPDATE KELAS ---
+app.put('/api/kelas/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { namaKelas } = req.body;
+        if (!namaKelas) {
+            return res.status(400).json({ message: 'Nama kelas tidak boleh kosong.' });
+        }
+
+        const kelas = await Kelas.findByPk(id);
+        if (!kelas) {
+            return res.status(404).json({ message: 'Kelas tidak ditemukan.' });
+        }
+
+        kelas.namaKelas = namaKelas;
+        await kelas.save();
+        res.json(kelas);
+    } catch (error) {
+        console.error("UPDATE KELAS ERROR:", error);
+        res.status(500).json({ message: 'Gagal mengupdate kelas' });
+    }
+});
+
+// --- [ENDPOINT BARU] UNTUK DELETE KELAS ---
+app.delete('/api/kelas/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const kelas = await Kelas.findByPk(id);
+        if (!kelas) {
+            return res.status(404).json({ message: 'Kelas tidak ditemukan.' });
+        }
+
+        await kelas.destroy(); // Ini akan menghapus kelas dan semua data terkaitnya
+        res.status(200).json({ message: 'Kelas berhasil dihapus.' });
+    } catch (error) {
+        console.error("DELETE KELAS ERROR:", error);
+        res.status(500).json({ message: 'Gagal menghapus kelas' });
+    }
+});
+
+
+// --- [ENDPOINT BARU] UNTUK SISWA KELUAR DARI KELAS ---
+app.delete('/api/kelas/:kelasId/leave', async (req, res) => {
+    try {
+        const { kelasId } = req.params;
+        const { siswaId } = req.body;
+
+        if (!siswaId) {
+            return res.status(400).json({ message: 'ID Siswa wajib diisi.' });
+        }
+
+        const kelas = await Kelas.findByPk(kelasId);
+        if (!kelas) {
+            return res.status(404).json({ message: 'Kelas tidak ditemukan.' });
+        }
+
+        const siswa = await User.findByPk(siswaId);
+        if (!siswa) {
+            return res.status(404).json({ message: 'Siswa tidak ditemukan.' });
+        }
+
+        // Hapus asosiasi siswa dari kelas di tabel penghubung (KelasSiswa)
+        await kelas.removeSiswa(siswa);
+
+        // Hapus juga semua rekaman absensi siswa di kelas ini
+        const sesiDiKelasIni = await SesiAbsensi.findAll({ where: { kelasId: kelas.id }, attributes: ['id'] });
+        const sesiIds = sesiDiKelasIni.map(s => s.id);
+
+        if (sesiIds.length > 0) {
+            await Absensi.destroy({
+                where: {
+                    userId: siswaId,
+                    sesiId: { [Sequelize.Op.in]: sesiIds }
+                }
+            });
+        }
+
+        res.status(200).json({ message: `Anda berhasil keluar dari kelas ${kelas.namaKelas}.` });
+
+    } catch (error) {
+        console.error("LEAVE CLASS ERROR:", error);
+        res.status(500).json({ message: 'Gagal keluar dari kelas' });
+    }
+});
 // PERBAIKAN KEDUA: Tambahkan `id` sesi ke riwayat siswa agar bisa absen
 // --- [PERBAIKAN FINAL] Endpoint untuk RIWAYAT ABSENSI SISWA ---
 // --- [PERBAIKAN FINAL] Endpoint untuk RIWAYAT ABSENSI SISWA ---

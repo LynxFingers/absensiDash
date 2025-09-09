@@ -31,7 +31,7 @@ function App() {
             
             {/* Rute Dosen */}
             <Route path="/dosen" element={<PrivateRoute role="dosen"><DosenDashboard /></PrivateRoute>} />
-            <Route path="/kelas/:id" element={<PrivateRoute role="dosen"><DetailKelasPage /></PrivateRoute>} />
+            <Route path="/dosen/kelas/:id" element={<PrivateRoute role="dosen"><DetailKelasPage /></PrivateRoute>} />
 
             {/* Rute Siswa */}
             <Route path="/siswa" element={<PrivateRoute role="siswa"><StudentDashboard /></PrivateRoute>} />

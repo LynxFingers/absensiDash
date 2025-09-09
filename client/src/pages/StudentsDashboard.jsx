@@ -87,6 +87,20 @@ function StudentDashboard() {
     }
   };
 
+  const handleLeaveClass = async (kelasId) => {
+        if (window.confirm('Apakah Anda yakin ingin keluar dari kelas ini? Semua riwayat absensi Anda di kelas ini akan dihapus.')) {
+            try {
+                await axios.delete(`http://localhost:3001/api/kelas/${kelasId}/leave`, {
+                    data: { siswaId: user.id } // Kirim siswaId di dalam body untuk request DELETE
+                });
+                alert('Anda berhasil keluar dari kelas.');
+                fetchEnrolledClasses(); // Refresh daftar kelas
+            } catch (error) {
+                alert(error.response?.data?.message || 'Gagal keluar dari kelas.');
+            }
+        }
+    };
+
   return (
     <div className="w-full p-4 sm:p-6 lg:p-8">
       <div className="bg-gray-100 rounded-2xl shadow-lg p-6 sm:p-8 w-full max-w-7xl mx-auto">
@@ -129,7 +143,7 @@ function StudentDashboard() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {enrolledClasses.map(cls => (
-                <StudentClassCard key={cls.id} id={cls.id} namaKelas={cls.namaKelas} kodeKelas={cls.kodeKelas} />
+                <StudentClassCard key={cls.id} id={cls.id} namaKelas={cls.namaKelas} kodeKelas={cls.kodeKelas} onLeave={handleLeaveClass}  />
               ))}
             </div>
           )}
